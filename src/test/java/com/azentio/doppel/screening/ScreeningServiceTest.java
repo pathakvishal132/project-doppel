@@ -94,7 +94,7 @@ class ScreeningServiceTest {
         assertThat(a.getStatus()).isEqualTo(AlertStatus.OPEN);
         assertThat(a.getDecision()).isEqualTo(Decision.BLOCK);
         assertThat(a.getBrandId()).isEqualTo(1L);
-        assertThat(a.getReasons()).isEqualTo("BRAND_EXACT:zentrabank;LURE_KEYWORD:refund;LURE_KEYWORD:refunds");
+        assertThat(a.getReasons()).isEqualTo("BRAND_EXACT:zentrabank;LURE_KEYWORD:refund");
         assertThat(a.getMaskedAccount()).isEqualTo("XXXXXXXX9012");
         assertThat(a.getRegistrantRef()).isEqualTo(saved.getRegistrantRef());
     }

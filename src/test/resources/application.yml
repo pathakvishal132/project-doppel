@@ -22,4 +22,4 @@ doppel:
   thresholds:
     block: 70
     review: 40
-  lure-keywords: [refund, refunds, support, helpdesk, help, care, customercare, kyc, verify, verification, reward, rewards, cashback, offer, bonus, claim, prize, lottery, official, service, billpay, update]
+  lure-keywords: [support, care, refund, kyc, cashback, helpline, reward, verify, offer]

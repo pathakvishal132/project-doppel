@@ -17,8 +17,8 @@ public final class TestFixtures {
                 "test-secret",
                 new DoppelProperties.Scores(50, 60, 40, 20),
                 new DoppelProperties.Thresholds(70, 40),
-                List.of("refund", "refunds", "support", "helpdesk", "help", "care", "kyc", "cashback", "offer",
-                        "reward", "update"));
+                // assignment defaults
+                List.of("support", "care", "refund", "kyc", "cashback", "helpline", "reward", "verify", "offer"));
     }
 
     public static Brand zentraBank() {

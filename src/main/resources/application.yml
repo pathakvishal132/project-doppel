@@ -27,26 +27,14 @@ doppel:
   thresholds:
     block: 70
     review: 40
+  # assignment defaults
   lure-keywords:
-    - refund
-    - refunds
     - support
-    - helpdesk
-    - help
     - care
-    - customercare
+    - refund
     - kyc
-    - verify
-    - verification
-    - reward
-    - rewards
     - cashback
+    - helpline
+    - reward
+    - verify
     - offer
-    - bonus
-    - claim
-    - prize
-    - lottery
-    - official
-    - service
-    - billpay
-    - update

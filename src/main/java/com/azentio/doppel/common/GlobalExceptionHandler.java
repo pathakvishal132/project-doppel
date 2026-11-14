@@ -11,6 +11,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
+import com.azentio.doppel.brand.BrandConflictException;
+
 /**
  * Converts errors to 400 responses. Rejected values are deliberately NOT echoed back,
  * so an invalid registrant account number never appears in a response or log.
@@ -41,6 +43,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ApiError> handleIllegalArgument(IllegalArgumentException ex) {
         return badRequest("BAD_REQUEST", ex.getMessage(), List.of());
+    }
+
+    @ExceptionHandler(BrandConflictException.class)
+    public ResponseEntity<ApiError> handleConflict(BrandConflictException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ApiError(HttpStatus.CONFLICT.value(), "CONFLICT", ex.getMessage(), List.of()));
     }
 
     private ResponseEntity<ApiError> badRequest(String code, String message, List<ApiError.FieldError> errors) {

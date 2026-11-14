@@ -12,8 +12,29 @@ Out of scope for Task 1: Redis, React UI, Task 2 and Task 3.
 | Method | Path | Description |
 |---|---|---|
 | GET  | `/api/v1/brands` | Brand registry (id, name, matching tokens, official VPAs) |
+| POST | `/api/v1/brands` | Add a brand `{name, tokens, officialVpas}`; 201, 400 on invalid input, 409 on duplicate name/VPA |
 | POST | `/api/v1/payee-screenings` | Screen a payee (idempotent on `requestId`) |
 | GET  | `/api/v1/alerts?status=OPEN&brandId=&page=0&size=20` | Alerts, newest first, filterable and paginated (`size` ≤ 100) |
+
+### Add a brand
+```bash
+curl -X POST localhost:8080/api/v1/brands -H 'Content-Type: application/json' -d '{
+  "name": "OrbitFlix Streaming", "tokens": ["orbitflix"], "officialVpas": ["orbitflix@icici"]
+}'
+# 201 {"id":100,"name":"OrbitFlix Streaming","matchingTokens":["orbitflix"],"officialVpas":["orbitflix@icici"]}
+```
+- `name` required (≤ 100), unique ignoring case → otherwise **409**.
+- `tokens` 1–20 non-blank entries (≤ 64). Stored in exact form (`Vortexa-Tel` → `vortexatel`).
+- `officialVpas` required list (may be empty), each must match the VPA regex. Stored lower-cased. A VPA already owned by
+  another brand → **409**.
+- The very next screening uses the new brand, with no restart (see *Brand cache*).
+
+### Brand cache
+Screening reads the registry through `BrandService.findAll()`, which is `@Cacheable("brands")`. It uses Spring's built-in
+in-memory cache (`spring-boot-starter-cache` → `ConcurrentMapCacheManager`, no Redis), so the database is read once,
+not on every screening. `POST /api/v1/brands` evicts the cache **after** its insert commits, so the next screening
+reloads the registry. Limits: the cache is per application instance (with several instances, others would keep a
+stale copy until restarted), and rows inserted directly in SQL are not seen until the cache is cleared.
 
 ### Screen a payee
 ```bash
@@ -90,6 +111,7 @@ Flyway migrations run on startup:
 - `V1__create_tables.sql`: `brand`, `brand_token`, `brand_vpa`, `screening`, `alert` (unique `request_id`).
 - `V2__seed_brands.sql`: 17 fictional brands, including the mandatory Zentra Bank, ShopKart, Electra Power.
 - `V3__widen_vpa_columns.sql`: widens `vpa` columns to 321 chars, the maximum VPA length the regex allows.
+- `V4__brand_id_sequence.sql`: `brand_id_seq` (starts at 100) for brands added via the API.
 
 ```bash
 createuser doppel --pwprompt
@@ -128,6 +150,7 @@ Docker and PostgreSQL are not needed.
 | `AccountProtectorTest` | masking, HMAC-SHA256 (well-known test vector), keying |
 | `ScreeningServiceTest` (Mockito) | alert only for REVIEW/BLOCK, duplicate requestId, unique-constraint race, no full account persisted |
 | `ScreeningApiIntegrationTest` | REST endpoints, 400 field errors, idempotency (incl. 16 concurrent duplicate requests), alert filters/pagination/order, max-length VPA, offset timestamps, no account leakage (responses, DB, logs) |
+| `BrandApiIntegrationTest` | POST brand: 201, normalisation, 400 field errors, 409 duplicate name/VPA, next screening uses new brand, screening served from cache |
 | `ScreeningRequestTest` | account redacted in `toString()` |
 | `LabelledHandlesEvaluationTest` | runs `src/test/resources/labelled_handles.csv` and prints confusion matrix / precision / recall / per-category accuracy |
 
@@ -137,7 +160,7 @@ createdb doppel_test
 SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/doppel_test SPRING_DATASOURCE_USERNAME=doppel \
 SPRING_DATASOURCE_PASSWORD=... SPRING_DATASOURCE_DRIVER_CLASS_NAME=org.postgresql.Driver mvn clean test
 ```
-All 70 tests also pass on PostgreSQL 14.
+All 76 tests also pass on PostgreSQL 14.
 
 ## Evaluation results
 

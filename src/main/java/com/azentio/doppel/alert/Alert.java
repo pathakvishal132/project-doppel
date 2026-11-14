@@ -12,7 +12,6 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import jakarta.persistence.Version;
 
 /** Created only for REVIEW and BLOCK screenings. */
 @Entity
@@ -61,15 +60,6 @@ public class Alert {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
-    @Enumerated(EnumType.STRING)
-    private Disposition disposition;
-
-    @Column(name = "updated_at")
-    private Instant updatedAt;
-
-    @Version
-    private long version;
-
     protected Alert() {
     }
 
@@ -103,13 +93,4 @@ public class Alert {
     public String getRegistrantRef() { return registrantRef; }
     public AlertStatus getStatus() { return status; }
     public Instant getCreatedAt() { return createdAt; }
-    public Disposition getDisposition() { return disposition; }
-    public Instant getUpdatedAt() { return updatedAt; }
-
-    /** Records the analyst verdict and closes the alert. */
-    public void close(Disposition disposition, Instant now) {
-        this.disposition = disposition;
-        this.status = AlertStatus.CLOSED;
-        this.updatedAt = now;
-    }
 }

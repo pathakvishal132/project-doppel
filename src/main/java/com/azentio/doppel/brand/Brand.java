@@ -8,8 +8,11 @@ import jakarta.persistence.Column;
 import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.Table;
 
 @Entity
@@ -17,6 +20,8 @@ import jakarta.persistence.Table;
 public class Brand {
 
     @Id
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "brand_id_gen")
+    @SequenceGenerator(name = "brand_id_gen", sequenceName = "brand_id_seq", allocationSize = 1)
     private Long id;
 
     @Column(nullable = false, unique = true)
@@ -40,6 +45,11 @@ public class Brand {
         this.name = name;
         this.tokens = new LinkedHashSet<>(tokens);
         this.officialVpas = new LinkedHashSet<>(officialVpas);
+    }
+
+    /** New brand; the id comes from brand_id_seq. */
+    public Brand(String name, Set<String> tokens, Set<String> officialVpas) {
+        this(null, name, tokens, officialVpas);
     }
 
     public Long getId() {

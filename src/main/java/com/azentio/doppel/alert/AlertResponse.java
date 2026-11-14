@@ -20,14 +20,11 @@ public record AlertResponse(
         String maskedAccount,
         String registrantRef,
         AlertStatus status,
-        Disposition disposition,
-        Instant createdAt,
-        Instant updatedAt) {
+        Instant createdAt) {
 
     static AlertResponse from(Alert a) {
         return new AlertResponse(a.getId(), a.getRequestId(), a.getVpa(), a.getDisplayName(), a.getBrandId(),
                 a.getBrandName(), a.getDecision(), a.getScore(), Reasons.split(a.getReasons()),
-                a.getMaskedAccount(), a.getRegistrantRef(), a.getStatus(), a.getDisposition(), a.getCreatedAt(),
-                a.getUpdatedAt());
+                a.getMaskedAccount(), a.getRegistrantRef(), a.getStatus(), a.getCreatedAt());
     }
 }

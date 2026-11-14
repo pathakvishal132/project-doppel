@@ -24,9 +24,12 @@ server:
   port: ${SERVER_PORT:8080}
 
 doppel:
-  # redis = Redis-backed screening cache; memory = in-process (unit tests only)
+  # redis = Redis-backed screening cache + campaign tracker; memory = in-process (unit tests only)
   store: ${DOPPEL_STORE:redis}
   screening-cache-ttl: 24h
+  campaign:
+    window: 60m
+    min-distinct-vpas: 3
   # Secret key for HMAC-SHA256 of the registrant account. MUST be overridden in every real environment.
   hmac-secret: ${DOPPEL_HMAC_SECRET:local-dev-only-secret-change-me}
   scores:
@@ -34,6 +37,7 @@ doppel:
     homoglyph: 60
     typosquat: 40
     lure-keyword: 20
+    campaign-burst: 30
   thresholds:
     block: 70
     review: 40

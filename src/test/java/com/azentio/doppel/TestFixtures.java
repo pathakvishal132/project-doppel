@@ -16,11 +16,12 @@ public final class TestFixtures {
     public static DoppelProperties properties() {
         return new DoppelProperties(
                 "test-secret",
-                new DoppelProperties.Scores(50, 60, 40, 20),
+                new DoppelProperties.Scores(50, 60, 40, 20, 30),
                 new DoppelProperties.Thresholds(70, 40),
                 // assignment defaults
                 List.of("support", "care", "refund", "kyc", "cashback", "helpline", "reward", "verify", "offer"),
-                Duration.ofHours(24));
+                Duration.ofHours(24),
+                new DoppelProperties.Campaign(Duration.ofMinutes(60), 3));
     }
 
     public static Brand zentraBank() {

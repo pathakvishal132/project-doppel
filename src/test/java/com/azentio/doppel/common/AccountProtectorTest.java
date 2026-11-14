@@ -13,8 +13,9 @@ import com.azentio.doppel.config.DoppelProperties;
 class AccountProtectorTest {
 
     private static AccountProtector protector(String secret) {
-        return new AccountProtector(new DoppelProperties(secret, new DoppelProperties.Scores(50, 60, 40, 20),
-                new DoppelProperties.Thresholds(70, 40), List.of(), Duration.ofHours(24)));
+        return new AccountProtector(new DoppelProperties(secret, new DoppelProperties.Scores(50, 60, 40, 20, 30),
+                new DoppelProperties.Thresholds(70, 40), List.of(), Duration.ofHours(24),
+                new DoppelProperties.Campaign(Duration.ofMinutes(60), 3)));
     }
 
     @Test

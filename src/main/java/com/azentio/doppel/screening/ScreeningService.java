@@ -5,7 +5,9 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 
@@ -20,6 +22,7 @@ import com.azentio.doppel.alert.AlertRepository;
 import com.azentio.doppel.alert.AlertStatus;
 import com.azentio.doppel.brand.BrandService;
 import com.azentio.doppel.brand.RegistryVersion;
+import com.azentio.doppel.campaign.CampaignTracker;
 import com.azentio.doppel.common.AccountProtector;
 import com.azentio.doppel.config.DoppelProperties;
 import com.azentio.doppel.matching.Decision;
@@ -30,12 +33,15 @@ public class ScreeningService {
 
     private static final Logger log = LoggerFactory.getLogger(ScreeningService.class);
 
+    public static final String CAMPAIGN_BURST = "CAMPAIGN_BURST";
+
     private final ScreeningRepository screeningRepository;
     private final AlertRepository alertRepository;
     private final BrandService brandService;
     private final RegistryVersion registryVersion;
     private final MatchingService matchingService;
     private final ScreeningCache screeningCache;
+    private final CampaignTracker campaignTracker;
     private final AccountProtector accountProtector;
     private final DoppelProperties properties;
     private final TransactionTemplate transactionTemplate;
@@ -43,7 +49,7 @@ public class ScreeningService {
 
     public ScreeningService(ScreeningRepository screeningRepository, AlertRepository alertRepository,
             BrandService brandService, RegistryVersion registryVersion, MatchingService matchingService,
-            ScreeningCache screeningCache, AccountProtector accountProtector,
+            ScreeningCache screeningCache, CampaignTracker campaignTracker, AccountProtector accountProtector,
             DoppelProperties properties, TransactionTemplate transactionTemplate, Clock clock) {
         this.screeningRepository = screeningRepository;
         this.alertRepository = alertRepository;
@@ -51,6 +57,7 @@ public class ScreeningService {
         this.registryVersion = registryVersion;
         this.matchingService = matchingService;
         this.screeningCache = screeningCache;
+        this.campaignTracker = campaignTracker;
         this.accountProtector = accountProtector;
         this.properties = properties;
         this.transactionTemplate = transactionTemplate;
@@ -60,9 +67,9 @@ public class ScreeningService {
     /**
      * Screens a payee.
      * <ol>
-     *   <li>Repeated requestId → original stored response (no re-scoring, no new alert).</li>
+     *   <li>Repeated requestId → original stored response (no re-scoring, no campaign count, no new alert).</li>
      *   <li>Brand matching → from the screening cache when possible (key includes the registry version).</li>
-     *   <li>Decision, persistence and alerting → on every request.</li>
+     *   <li>Campaign check, decision, persistence and alerting → on every request.</li>
      * </ol>
      */
     public ScreeningResponse screen(ScreeningRequest request) {
@@ -83,11 +90,24 @@ public class ScreeningService {
             return computed;
         });
 
-        // 2. Decision + persistence (never cached)
+        // 2. Campaign burst (never cached)
         String registrantRef = accountProtector.hmac(request.registrantAccount());
         int score = match.baseScore();
+        List<String> reasons = new ArrayList<>(match.reasons());
+        if (match.baseScore() >= properties.thresholds().review()) {
+            DoppelProperties.Campaign campaign = properties.campaign();
+            int distinct = campaignTracker.recordFlaggedVpa(registrantRef,
+                    request.vpa().toLowerCase(Locale.ROOT), request.timestamp(), campaign.window());
+            if (distinct >= campaign.minDistinctVpas()) {
+                score += properties.scores().campaignBurst();
+                reasons.add(CAMPAIGN_BURST + ":" + distinct + " distinct flagged VPAs in "
+                        + campaign.window().toMinutes() + " min");
+            }
+        }
+
+        // 3. Decision + persistence (never cached)
         Decision decision = matchingService.decide(score);
-        Scored scored = new Scored(match, score, decision, match.reasons(), hit.isPresent(), registrantRef);
+        Scored scored = new Scored(match, score, decision, reasons, hit.isPresent(), registrantRef);
         try {
             ScreeningRecord saved = transactionTemplate.execute(status -> persist(request, scored));
             log.info("Screened requestId={} decision={} score={} brandId={} cached={}",
@@ -102,7 +122,7 @@ public class ScreeningService {
         }
     }
 
-    private record Scored(CachedMatch match, int score, Decision decision, java.util.List<String> reasons, boolean cached,
+    private record Scored(CachedMatch match, int score, Decision decision, List<String> reasons, boolean cached,
             String registrantRef) {
     }
 

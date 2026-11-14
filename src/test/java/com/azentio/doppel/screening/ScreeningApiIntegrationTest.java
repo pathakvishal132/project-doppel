@@ -38,12 +38,15 @@ class ScreeningApiIntegrationTest {
     private JdbcTemplate jdbc;
     @Autowired
     private InMemoryScreeningCache screeningCache;
+    @Autowired
+    private com.azentio.doppel.campaign.InMemoryCampaignTracker campaignTracker;
 
     @BeforeEach
     void cleanDb() {
         jdbc.update("DELETE FROM alert");
         jdbc.update("DELETE FROM screening");
         screeningCache.clear();
+        campaignTracker.clear();
     }
 
     private static String body(String requestId, String vpa, String displayName, String account) {

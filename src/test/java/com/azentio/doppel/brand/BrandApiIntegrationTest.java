@@ -22,6 +22,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 
+import com.azentio.doppel.campaign.InMemoryCampaignTracker;
 import com.azentio.doppel.config.CacheConfig;
 import com.azentio.doppel.screening.InMemoryScreeningCache;
 
@@ -43,6 +44,8 @@ class BrandApiIntegrationTest {
     private RegistryVersion registryVersion;
     @Autowired
     private InMemoryScreeningCache screeningCache;
+    @Autowired
+    private InMemoryCampaignTracker campaignTracker;
 
     private int requestCounter;
 
@@ -58,6 +61,7 @@ class BrandApiIntegrationTest {
         jdbc.update("UPDATE brand_registry_version SET version = version + 1 WHERE id = 1"); // registry changed
         cacheManager.getCache(CacheConfig.BRANDS_CACHE).clear();
         screeningCache.clear();
+        campaignTracker.clear();
     }
 
     private ResultActions createBrand(String json) throws Exception {

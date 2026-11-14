@@ -29,6 +29,7 @@ import com.azentio.doppel.alert.AlertRepository;
 import com.azentio.doppel.alert.AlertStatus;
 import com.azentio.doppel.brand.BrandService;
 import com.azentio.doppel.brand.RegistryVersion;
+import com.azentio.doppel.campaign.InMemoryCampaignTracker;
 import com.azentio.doppel.common.AccountProtector;
 import com.azentio.doppel.matching.Decision;
 import com.azentio.doppel.matching.MatchingService;
@@ -57,8 +58,8 @@ class ScreeningServiceTest {
         var props = TestFixtures.properties();
         Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
         service = new ScreeningService(screeningRepository, alertRepository, brandService, registryVersion,
-                new MatchingService(props), new InMemoryScreeningCache(clock), new AccountProtector(props), props,
-                new TransactionTemplate(transactionManager), clock);
+                new MatchingService(props), new InMemoryScreeningCache(clock), new InMemoryCampaignTracker(),
+                new AccountProtector(props), props, new TransactionTemplate(transactionManager), clock);
     }
 
     private static ScreeningRequest request(String requestId, String vpa, String displayName) {

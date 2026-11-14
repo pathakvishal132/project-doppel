@@ -17,12 +17,16 @@ spring:
 doppel:
   store: memory
   screening-cache-ttl: 24h
+  campaign:
+    window: 60m
+    min-distinct-vpas: 3
   hmac-secret: test-secret
   scores:
     brand-exact: 50
     homoglyph: 60
     typosquat: 40
     lure-keyword: 20
+    campaign-burst: 30
   thresholds:
     block: 70
     review: 40

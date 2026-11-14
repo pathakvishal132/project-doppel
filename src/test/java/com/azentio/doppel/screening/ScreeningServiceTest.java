@@ -28,6 +28,7 @@ import com.azentio.doppel.alert.Alert;
 import com.azentio.doppel.alert.AlertRepository;
 import com.azentio.doppel.alert.AlertStatus;
 import com.azentio.doppel.brand.BrandService;
+import com.azentio.doppel.brand.RegistryVersion;
 import com.azentio.doppel.common.AccountProtector;
 import com.azentio.doppel.matching.Decision;
 import com.azentio.doppel.matching.MatchingService;
@@ -46,13 +47,15 @@ class ScreeningServiceTest {
     private BrandService brandService;
     @Mock
     private PlatformTransactionManager transactionManager;
+    @Mock
+    private RegistryVersion registryVersion;
 
     private ScreeningService service;
 
     @BeforeEach
     void setUp() {
         var props = TestFixtures.properties();
-        service = new ScreeningService(screeningRepository, alertRepository, brandService,
+        service = new ScreeningService(screeningRepository, alertRepository, brandService, registryVersion,
                 new MatchingService(props), new AccountProtector(props), new TransactionTemplate(transactionManager),
                 Clock.fixed(NOW, ZoneOffset.UTC));
     }
@@ -62,7 +65,7 @@ class ScreeningServiceTest {
     }
 
     private void stubPersistence() {
-        when(brandService.findAll()).thenReturn(TestFixtures.mandatoryBrands());
+        when(brandService.findAll(0L)).thenReturn(TestFixtures.mandatoryBrands());
         when(transactionManager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
         when(screeningRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
     }
@@ -124,12 +127,12 @@ class ScreeningServiceTest {
         assertThat(response.decision()).isEqualTo(Decision.BLOCK);
         assertThat(response.vpa()).isEqualTo("zentrabank.refund@okaxis");
         verify(screeningRepository, never()).saveAndFlush(any());
-        verifyNoInteractions(alertRepository, brandService);
+        verifyNoInteractions(alertRepository, brandService, registryVersion);
     }
 
     @Test
     void concurrentDuplicateHittingUniqueConstraintReturnsStoredResult() {
-        when(brandService.findAll()).thenReturn(TestFixtures.mandatoryBrands());
+        when(brandService.findAll(0L)).thenReturn(TestFixtures.mandatoryBrands());
         when(transactionManager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
         ScreeningRecord winner = new ScreeningRecord("req-009", "sh0pkart@ybl", "Shop", "XXXXXXXX9012", "ref",
                 2L, "ShopKart", Decision.REVIEW, 60, "HOMOGLYPH:shopkart", Instant.parse("2026-11-14T12:00:00Z"), NOW);

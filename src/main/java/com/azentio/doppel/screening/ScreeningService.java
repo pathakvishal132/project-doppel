@@ -13,6 +13,7 @@ import com.azentio.doppel.alert.Alert;
 import com.azentio.doppel.alert.AlertRepository;
 import com.azentio.doppel.alert.AlertStatus;
 import com.azentio.doppel.brand.BrandService;
+import com.azentio.doppel.brand.RegistryVersion;
 import com.azentio.doppel.common.AccountProtector;
 import com.azentio.doppel.matching.Decision;
 import com.azentio.doppel.matching.MatchResult;
@@ -26,17 +27,19 @@ public class ScreeningService {
     private final ScreeningRepository screeningRepository;
     private final AlertRepository alertRepository;
     private final BrandService brandService;
+    private final RegistryVersion registryVersion;
     private final MatchingService matchingService;
     private final AccountProtector accountProtector;
     private final TransactionTemplate transactionTemplate;
     private final Clock clock;
 
     public ScreeningService(ScreeningRepository screeningRepository, AlertRepository alertRepository,
-            BrandService brandService, MatchingService matchingService, AccountProtector accountProtector,
-            TransactionTemplate transactionTemplate, Clock clock) {
+            BrandService brandService, RegistryVersion registryVersion, MatchingService matchingService,
+            AccountProtector accountProtector, TransactionTemplate transactionTemplate, Clock clock) {
         this.screeningRepository = screeningRepository;
         this.alertRepository = alertRepository;
         this.brandService = brandService;
+        this.registryVersion = registryVersion;
         this.matchingService = matchingService;
         this.accountProtector = accountProtector;
         this.transactionTemplate = transactionTemplate;
@@ -54,7 +57,8 @@ public class ScreeningService {
             return ScreeningResponse.from(existing.get());
         }
 
-        MatchResult result = matchingService.match(request.vpa(), request.displayName(), brandService.findAll());
+        long version = registryVersion.current();
+        MatchResult result = matchingService.match(request.vpa(), request.displayName(), brandService.findAll(version));
 
         try {
             ScreeningRecord saved = transactionTemplate.execute(status -> persist(request, result));

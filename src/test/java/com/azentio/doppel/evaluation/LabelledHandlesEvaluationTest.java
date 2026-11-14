@@ -15,7 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
 import com.azentio.doppel.brand.Brand;
-import com.azentio.doppel.brand.BrandService;
+import com.azentio.doppel.brand.BrandRepository;
 import com.azentio.doppel.matching.Decision;
 import com.azentio.doppel.matching.MatchResult;
 import com.azentio.doppel.matching.MatchingService;
@@ -34,7 +34,7 @@ class LabelledHandlesEvaluationTest {
     @Autowired
     private MatchingService matchingService;
     @Autowired
-    private BrandService brandService;
+    private BrandRepository brandRepository;
 
     record Row(String vpa, String displayName, String category, boolean suspicious) {
     }
@@ -42,7 +42,7 @@ class LabelledHandlesEvaluationTest {
     @Test
     void precisionAndRecallMeetAcceptanceCriteria() throws Exception {
         List<Row> rows = loadRows();
-        List<Brand> brands = brandService.findAll();
+        List<Brand> brands = brandRepository.findAllByOrderByIdAsc();
         assertThat(rows).hasSizeGreaterThanOrEqualTo(120);
 
         int tp = 0, fp = 0, tn = 0, fn = 0;

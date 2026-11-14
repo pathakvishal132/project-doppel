@@ -36,11 +36,14 @@ class ScreeningApiIntegrationTest {
     private MockMvc mvc;
     @Autowired
     private JdbcTemplate jdbc;
+    @Autowired
+    private InMemoryScreeningCache screeningCache;
 
     @BeforeEach
     void cleanDb() {
         jdbc.update("DELETE FROM alert");
         jdbc.update("DELETE FROM screening");
+        screeningCache.clear();
     }
 
     private static String body(String requestId, String vpa, String displayName, String account) {

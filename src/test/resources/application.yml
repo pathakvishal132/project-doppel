@@ -1,4 +1,6 @@
 spring:
+  cache:
+    type: simple
   datasource:
     url: jdbc:h2:mem:doppel;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1
     username: sa
@@ -13,6 +15,8 @@ spring:
     locations: classpath:db/migration
 
 doppel:
+  store: memory
+  screening-cache-ttl: 24h
   hmac-secret: test-secret
   scores:
     brand-exact: 50

@@ -23,6 +23,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 
 import com.azentio.doppel.config.CacheConfig;
+import com.azentio.doppel.screening.InMemoryScreeningCache;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -40,6 +41,8 @@ class BrandApiIntegrationTest {
     private CacheManager cacheManager;
     @Autowired
     private RegistryVersion registryVersion;
+    @Autowired
+    private InMemoryScreeningCache screeningCache;
 
     private int requestCounter;
 
@@ -54,6 +57,7 @@ class BrandApiIntegrationTest {
         jdbc.update("DELETE FROM brand WHERE id >= 100");
         jdbc.update("UPDATE brand_registry_version SET version = version + 1 WHERE id = 1"); // registry changed
         cacheManager.getCache(CacheConfig.BRANDS_CACHE).clear();
+        screeningCache.clear();
     }
 
     private ResultActions createBrand(String json) throws Exception {
@@ -108,17 +112,21 @@ class BrandApiIntegrationTest {
     }
 
     @Test
-    void brandCacheIsKeyedOnRegistryVersion() throws Exception {
+    void cachesAreKeyedOnRegistryVersion() throws Exception {
         screen("hiddenbrand.kyc@ybl", "x").andExpect(jsonPath("$.decision").value("ALLOW"));
 
-        // insert directly in SQL, WITHOUT bumping the version: the cached brand list is still served
+        // insert directly in SQL, WITHOUT bumping the version: caches still serve the old registry
         jdbc.update("INSERT INTO brand (id, name) VALUES (500, 'Hidden Brand')");
         jdbc.update("INSERT INTO brand_token (brand_id, token) VALUES (500, 'hiddenbrand')");
-        screen("hiddenbrand.kyc@ybl", "x").andExpect(jsonPath("$.decision").value("ALLOW"));
+        screen("hiddenbrand.kyc@ybl", "x")
+                .andExpect(jsonPath("$.decision").value("ALLOW"))
+                .andExpect(jsonPath("$.cached").value(true));
 
-        // bumping the version (what POST /api/v1/brands does in its transaction) makes the old list unreachable
+        // bumping the version (what POST /api/v1/brands does in its transaction) makes every cache entry unreachable
         jdbc.update("UPDATE brand_registry_version SET version = version + 1 WHERE id = 1");
-        screen("hiddenbrand.kyc@ybl", "x").andExpect(jsonPath("$.decision").value("BLOCK"));
+        screen("hiddenbrand.kyc@ybl", "x")
+                .andExpect(jsonPath("$.decision").value("BLOCK"))
+                .andExpect(jsonPath("$.cached").value(false));
     }
 
     @Test

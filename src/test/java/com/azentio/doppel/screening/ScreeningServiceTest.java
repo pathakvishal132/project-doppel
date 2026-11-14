@@ -55,9 +55,10 @@ class ScreeningServiceTest {
     @BeforeEach
     void setUp() {
         var props = TestFixtures.properties();
+        Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
         service = new ScreeningService(screeningRepository, alertRepository, brandService, registryVersion,
-                new MatchingService(props), new AccountProtector(props), new TransactionTemplate(transactionManager),
-                Clock.fixed(NOW, ZoneOffset.UTC));
+                new MatchingService(props), new InMemoryScreeningCache(clock), new AccountProtector(props), props,
+                new TransactionTemplate(transactionManager), clock);
     }
 
     private static ScreeningRequest request(String requestId, String vpa, String displayName) {
@@ -118,7 +119,7 @@ class ScreeningServiceTest {
     void duplicateRequestIdReturnsOriginalWithoutRescreeningOrSaving() {
         ScreeningRecord original = new ScreeningRecord("req-001", "zentrabank.refund@okaxis", "Zentra Bank Refunds",
                 "XXXXXXXX9012", "ref", 1L, "Zentra Bank", Decision.BLOCK, 70, "BRAND_EXACT:zentrabank",
-                Instant.parse("2026-11-14T12:00:00Z"), NOW);
+                Instant.parse("2026-11-14T12:00:00Z"), NOW, false);
         when(screeningRepository.findByRequestId("req-001")).thenReturn(Optional.of(original));
 
         // different payload, same requestId -> original response
@@ -135,7 +136,7 @@ class ScreeningServiceTest {
         when(brandService.findAll(0L)).thenReturn(TestFixtures.mandatoryBrands());
         when(transactionManager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
         ScreeningRecord winner = new ScreeningRecord("req-009", "sh0pkart@ybl", "Shop", "XXXXXXXX9012", "ref",
-                2L, "ShopKart", Decision.REVIEW, 60, "HOMOGLYPH:shopkart", Instant.parse("2026-11-14T12:00:00Z"), NOW);
+                2L, "ShopKart", Decision.REVIEW, 60, "HOMOGLYPH:shopkart", Instant.parse("2026-11-14T12:00:00Z"), NOW, false);
         when(screeningRepository.findByRequestId("req-009")).thenReturn(Optional.empty(), Optional.of(winner));
         when(screeningRepository.saveAndFlush(any())).thenThrow(new DataIntegrityViolationException("uq"));
 

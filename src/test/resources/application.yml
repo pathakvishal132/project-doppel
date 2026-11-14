@@ -1,5 +1,6 @@
 spring:
   cache:
+    # brand-list cache stays in process (ConcurrentMapCacheManager); Redis is used only via ScreeningCache
     type: simple
   datasource:
     url: jdbc:h2:mem:doppel;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1
@@ -10,6 +11,9 @@ spring:
     hibernate:
       ddl-auto: validate
     open-in-view: false
+    properties:
+      # load brand tokens/VPAs for 100 brands per query instead of 2 queries per brand
+      hibernate.default_batch_fetch_size: 100
   flyway:
     enabled: true
     locations: classpath:db/migration

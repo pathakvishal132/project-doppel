@@ -37,7 +37,7 @@ public class BrandService {
      * Brand registry for the given registry version, served from the in-memory "brands" cache. Keying on the
      * version means a list loaded before a registry change can never be returned for a newer version.
      */
-    @Cacheable(value = CacheConfig.BRANDS_CACHE, key = "#version")
+    @Cacheable(value = CacheConfig.BRANDS_CACHE, key = "#version", sync = true) // one loader, others wait
     @Transactional(readOnly = true)
     public List<Brand> findAll(long version) {
         log.debug("Loading brand registry from database");
@@ -51,7 +51,7 @@ public class BrandService {
 
     /**
      * Adds a brand and bumps the registry version in ONE transaction. The next screening reads the new version,
-     * so it misses the brand-list cache and is scored with the new brand.
+     * so it misses both the brand-list cache and the Redis screening cache and is scored with the new brand.
      * The in-memory brand cache is cleared afterwards only to free memory held by the old version.
      */
     @CacheEvict(value = CacheConfig.BRANDS_CACHE, allEntries = true)

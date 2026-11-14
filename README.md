@@ -29,14 +29,43 @@ curl -X POST localhost:8080/api/v1/brands -H 'Content-Type: application/json' -d
   another brand → **409**.
 - The very next screening uses the new brand, with no restart (see *Brand cache*).
 
-### Brand cache
-Screening reads the registry through `BrandService.findAll()`, which is `@Cacheable("brands")`. It uses Spring's built-in
-in-memory cache (`spring-boot-starter-cache` → `ConcurrentMapCacheManager`, no Redis), so the database is read once,
-not on every screening. `POST /api/v1/brands` evicts the cache **after** its insert commits, so the next screening
-reloads the registry. Limits: the cache is per application instance (with several instances, others would keep a
-stale copy until restarted), and rows inserted directly in SQL are not seen until the cache is cleared.
+### Caching and staleness (Task 2)
+Two caches, both keyed on a **registry version**:
+
+| Cache | Where | Key | Holds |
+|---|---|---|---|
+| Brand list | in-process (`spring.cache.type: simple`) | `version` | the brand registry |
+| Screening cache | **Redis** (`ScreeningCache` interface; `InMemoryScreeningCache` in unit tests) | `doppel:screen:v{version}:{sha256(lower(vpa) + "\n" + displayName)}`, TTL 24 h | matched brand, brand + lure reasons, base score |
+
+**Why a cached result can never go stale:** `brand_registry_version` (one row in PostgreSQL, V5) is incremented in the
+**same transaction** as the brand insert in `POST /api/v1/brands`. Every screening reads the current version first and
+builds its cache keys from it. Once the insert commits, every older entry is unreachable (it simply expires through its
+TTL), and the next screening is scored against the new registry. Because the version lives in the database and not in
+one JVM, this also holds with several app instances. No scan-and-delete over Redis keys is needed.
+
+Only the brand-matching part is cached. The campaign check, decision, persistence and alert creation run on every
+request. Responses carry `"cached": true|false`, which is stored so a replayed `requestId` returns an identical body.
+Redis errors in the screening cache count as a miss: screening still works, just without the cache.
+
+### Campaign detection (CAMPAIGN_BURST)
+A screening is *flagged* when its base score (brand + lure) reaches the REVIEW threshold. For each `registrantRef`
+(HMAC of the account), the sorted set `doppel:campaign:{registrantRef}` holds member = lower-cased VPA,
+score = request timestamp. `src/main/resources/redis/campaign_add_and_count.lua` runs **atomically** in Redis:
+1. remove members older than `timestamp - 60 min`
+2. add the VPA (a repeated VPA keeps its latest timestamp, so the distinct count is unchanged)
+3. count members with score ≥ `timestamp - 60 min`
+4. `PEXPIRE` the key by the window, so idle registrants leave no keys behind
+
+If the count is ≥ 3, `CAMPAIGN_BURST:<n> distinct flagged VPAs in 60 min` is added and the score gets +30 (configurable),
+which can move REVIEW to BLOCK. A replayed `requestId` returns the stored response before this step, so it never counts
+twice. The count has no upper bound on the timestamp, so concurrent requests whose timestamps arrive out of order still
+see every addition made before them. This is what makes "exactly 18 of 20" deterministic.
+
+Settings (`application.yml`): `doppel.scores.campaign-burst: 30`, `doppel.campaign.window: 60m`,
+`doppel.campaign.min-distinct-vpas: 3`, `doppel.screening-cache-ttl: 24h`, `doppel.store: redis|memory`.
 
 ### Screen a payee
+The response contains `"cached": false|true` (see *Caching*).
 ```bash
 curl -X POST localhost:8080/api/v1/payee-screenings -H 'Content-Type: application/json' -d '{
   "requestId": "req-001",
@@ -112,6 +141,8 @@ Flyway migrations run on startup:
 - `V2__seed_brands.sql`: 17 fictional brands, including the mandatory Zentra Bank, ShopKart, Electra Power.
 - `V3__widen_vpa_columns.sql`: widens `vpa` columns to 321 chars, the maximum VPA length the regex allows.
 - `V4__brand_id_sequence.sql`: `brand_id_seq` (starts at 100) for brands added via the API.
+- `V5__brand_registry_version.sql`: `brand_registry_version`, bumped with every registry change.
+- `V6__screening_cached_flag.sql`: `screening.cached`, so replays return an identical body.
 
 ```bash
 createuser doppel --pwprompt
@@ -121,7 +152,8 @@ createdb -O doppel doppel
 ## How to run
 
 ```bash
-cp .env.example .env             # then edit values (never commit .env)
+docker compose up -d                 # PostgreSQL 16 (localhost:5432) + Redis 7 (localhost:6379)
+cp .env.example .env                 # then edit values (never commit .env)
 set -a; source .env; set +a
 mvn spring-boot:run
 # or: mvn clean package && java -jar target/project-doppel-0.0.1-SNAPSHOT.jar
@@ -130,8 +162,10 @@ mvn spring-boot:run
 | Env var | Default | Purpose |
 |---|---|---|
 | `DB_URL` | `jdbc:postgresql://localhost:5432/doppel` | JDBC URL |
-| `DB_USERNAME` | `doppel` | DB user |
-| `DB_PASSWORD` | *(empty)* | DB password |
+| `DB_USERNAME` / `DB_PASSWORD` | `doppel` / *(empty)* | DB credentials (compose uses password `doppel`) |
+| `DB_POOL_SIZE` | `20` | Hikari pool size |
+| `REDIS_HOST` / `REDIS_PORT` | `localhost` / `6379` | Redis |
+| `DOPPEL_STORE` | `redis` | `memory` runs without Redis (single instance, testing only) |
 | `DOPPEL_HMAC_SECRET` | dev-only placeholder | **Must** be set in any real environment |
 | `SERVER_PORT` | `8080` | HTTP port |
 
@@ -140,8 +174,11 @@ mvn spring-boot:run
 ```bash
 mvn clean test
 ```
-Tests run fully offline against in-memory **H2 in PostgreSQL mode**, using the same Flyway migrations.
-Docker and PostgreSQL are not needed.
+Tests run fully offline against in-memory **H2 in PostgreSQL mode** (same Flyway migrations) and the in-memory
+cache/campaign implementations. Docker, PostgreSQL and Redis are not needed. `RedisIntegrationTest` uses a
+Testcontainers Redis and is **skipped automatically when Docker is not running**. To run it against an existing Redis
+instead: `DOPPEL_TEST_REDIS_HOST=localhost DOPPEL_TEST_REDIS_PORT=6379 mvn test -Dtest=RedisIntegrationTest`
+(it deletes `doppel:*` keys, so point it at a disposable Redis).
 
 | Test class | Covers |
 |---|---|
@@ -151,6 +188,8 @@ Docker and PostgreSQL are not needed.
 | `ScreeningServiceTest` (Mockito) | alert only for REVIEW/BLOCK, duplicate requestId, unique-constraint race, no full account persisted |
 | `ScreeningApiIntegrationTest` | REST endpoints, 400 field errors, idempotency (incl. 16 concurrent duplicate requests), alert filters/pagination/order, max-length VPA, offset timestamps, no account leakage (responses, DB, logs) |
 | `BrandApiIntegrationTest` | POST brand: 201, normalisation, 400 field errors, 409 duplicate name/VPA, next screening uses new brand, screening served from cache |
+| `ScreeningCacheAndCampaignTest` | in-memory store: `cached` false→true with same decision, `quickloan.help@ybl` ALLOW → POST brand → REVIEW + BRAND_EXACT, CAMPAIGN_BURST on 3rd distinct VPA, 60-min window driven by timestamps, replay does not count |
+| `RedisIntegrationTest` | **`integration` profile, Testcontainers Redis**: 20 concurrent distinct flagged VPAs → exactly 18 CAMPAIGN_BURST, re-screen/replay keep distinct count 20, key TTL, window expiry, cache TTL 24 h, quickloan flow |
 | `ScreeningRequestTest` | account redacted in `toString()` |
 | `LabelledHandlesEvaluationTest` | runs `src/test/resources/labelled_handles.csv` and prints confusion matrix / precision / recall / per-category accuracy |
 
@@ -160,7 +199,7 @@ createdb doppel_test
 SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/doppel_test SPRING_DATASOURCE_USERNAME=doppel \
 SPRING_DATASOURCE_PASSWORD=... SPRING_DATASOURCE_DRIVER_CLASS_NAME=org.postgresql.Driver mvn clean test
 ```
-All 76 tests also pass on PostgreSQL 14.
+All tests also pass on PostgreSQL 14.
 
 ## Evaluation results
 
@@ -203,11 +242,80 @@ that are one edit away from a brand (`medicare`/`medicore`).
   to `l` only, so a `1`-for-`i` plus one more edit exceeds the 1-edit budget for 6–9 char tokens.
 - **Coverage** (JaCoCo): 96.6% lines, 84.4% branches.
 
+## Load test (Task 2)
+
+`scripts/load.py` (Python 3, standard library only) adds 500 synthetic brands, then sends 2,000 screenings over
+400 distinct (VPA, display name) pairs from 100 registrants at concurrency 20. It prints latency percentiles (overall and
+split by cache hit/miss), decision counts, cache-hit rate and CAMPAIGN_BURST count.
+
+```bash
+docker compose up -d && mvn spring-boot:run      # in one terminal
+python3 scripts/load.py                          # in another (--base-url http://localhost:8080)
+```
+
+**Results on my machine** (Apple M1, 8 cores, 8 GB; client, app, PostgreSQL and Redis all on the same laptop).
+⚠️ Docker was not running on this machine, so these runs used **natively installed PostgreSQL 14 and Redis 8**
+instead of the compose containers. Rerun with `docker compose` for the official numbers.
+
+Run 1: fresh JVM, empty database (exactly the scenario the script describes):
+```
+Brands: 500/500 created in 0.7s (other statuses: {})
+Screenings: 2000 sent, 2000 OK, errors 0 | 400 distinct pairs, 100 registrants, concurrency 20
+Throughput: 909 req/s over 2.2s
+Latency ms: p50=11.7  p95=58.0  p99=167.7  mean=21.9  max=466.8
+  cache hits   n=1600  p50=9.7  p95=36.2  p99=90.6
+  cache misses n=400   p50=31.2  p95=164.2  p99=459.3
+Decisions: ALLOW=1337  REVIEW=61  BLOCK=602
+Cache-hit rate: 80.0% (1600/2000)   CAMPAIGN_BURST: 465
+```
+Server-side (Tomcat access log): p50 11 ms, p95 55 ms, p99 165 ms. That matches the client, so the Python client
+is not distorting the numbers.
+
+Same app process, later runs (JVM warm; each run adds 500 more brands, so 1,017 then 1,517 brands):
+```
+Run 2:  p50=8.8  p95=59.9  p99=136.3   (1,270 req/s)
+Run 3:  p50=6.1  p95=47.5  p99=133.9   (1,509 req/s)
+```
+
+**Target p95 < 50 ms: missed on a cold JVM (55–58 ms; 121 ms on the very first run, before the fixes below),
+met once warm (47.5 ms).** Where the time goes:
+- **Cold start dominates.** The first 400 requests are all cache misses on a JVM whose hot paths are not yet
+  JIT-compiled. Their server-side p95 is **153 ms**; the remaining 1,600 requests have p95 **34 ms**. Cache hits
+  overall: p50 ≈ 10 ms.
+- **Cache misses** cost matching against ~517 brands. After the fixes below this is ≈ 0.65 ms of CPU when warm; the rest
+  is the database round-trips every request makes anyway.
+- **Every request** still does about 4–5 network round-trips: duplicate lookup, registry version, Redis GET,
+  Lua EVAL for flagged payees, then INSERT screening (+ alert) in one transaction. With 20 concurrent clients on one
+  laptop, CPU contention between client, JVM, PostgreSQL and Redis adds tail latency (p99).
+
+Fixes made while measuring (first run p95 was **167 ms**):
+1. Loading the brand list took **1,035 SQL queries** (one per brand collection). `hibernate.default_batch_fetch_size: 100`
+   reduces that to ~13.
+2. All 20 threads missed the brand-list cache at once and each loaded it. `@Cacheable(sync = true)` → one loader.
+3. `MatchingService` normalised the texts once per brand. Now it does so once per request, with precompiled regexes.
+   That cut a cache miss from **3.8 ms to 0.65 ms** at 517 brands.
+
+Next steps if the cold p95 must be < 50 ms: pre-load the brand list and warm the matcher at startup, and keep the
+registry version in memory with a short-lived check (trading one DB round-trip per request).
+
+## Scaling the matcher to 10,000 brands
+A cache miss is currently O(brands × tokens × segments): fine at 500–1,500 brands (< 1 ms warm), but by linear extrapolation roughly 12 ms per miss at
+10,000. To scale: (1) precompute each brand's exact/folded token forms once per registry version instead of per
+request; (2) find BRAND_EXACT/HOMOGLYPH candidates with an **Aho-Corasick automaton** over all tokens (one pass over the
+text, independent of the brand count); (3) find TYPOSQUAT candidates with a **deletion index (SymSpell)** or a BK-tree
+keyed by token length, so only tokens within 1–2 edits are compared; (4) rebuild these structures when the registry
+version changes. The Redis screening cache already removes repeat work for popular handles.
+
 ## Known limitations
 - Short tokens that are real words or names (`electra`) and words 1 edit from a token (`medicare`,
   `electro`, `mediocre`) produce false positives at REVIEW level.
 - `1` is mapped to `l` only (see above).
 - A whitespace-only `displayName` is accepted (it is 1–100 characters). Add `@NotBlank` if it should be rejected.
+- The brand-list cache is per instance, but it is keyed by the shared DB registry version, so instances never serve
+  an old registry. They only each load the list once per version.
+- `doppel.store=memory` is for tests only: campaign counts and cache are per JVM.
+- If Redis is down, the screening cache degrades to "always miss", but campaign detection fails the request (500)
+  rather than silently skipping the check.
 - A concurrent duplicate that loses the race can cause Hibernate to log a unique-constraint ERROR line (the account is never part of the SQL) before
   the original response is returned.
 

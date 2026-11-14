@@ -3,6 +3,7 @@ package com.azentio.doppel.common;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.time.Duration;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
@@ -12,8 +13,9 @@ import com.azentio.doppel.config.DoppelProperties;
 class AccountProtectorTest {
 
     private static AccountProtector protector(String secret) {
-        return new AccountProtector(new DoppelProperties(secret, new DoppelProperties.Scores(50, 60, 40, 20),
-                new DoppelProperties.Thresholds(70, 40), List.of()));
+        return new AccountProtector(new DoppelProperties(secret, new DoppelProperties.Scores(50, 60, 40, 20, 30),
+                new DoppelProperties.Thresholds(70, 40), List.of(), Duration.ofHours(24),
+                new DoppelProperties.Campaign(Duration.ofMinutes(60), 3)));
     }
 
     @Test

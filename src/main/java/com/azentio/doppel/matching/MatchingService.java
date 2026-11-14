@@ -62,10 +62,15 @@ public class MatchingService {
         String handle = at >= 0 ? normalizedVpa.substring(0, at) : normalizedVpa;
         List<String> texts = List.of(handle, displayName == null ? "" : displayName);
 
+        // normalise each text once per request (not once per brand)
+        List<TextForms> forms = texts.stream()
+                .map(t -> new TextForms(TextNormalizer.compact(t), TextNormalizer.skeleton(t), typoCandidates(t)))
+                .toList();
+
         Brand bestBrand = null;
         Signal bestSignal = null;
         for (Brand brand : ordered) {
-            Signal signal = bestSignalFor(brand, texts);
+            Signal signal = bestSignalFor(brand, forms);
             // strictly greater → on ties the earlier (lower id) brand is kept
             if (signal != null && (bestSignal == null || signal.score() > bestSignal.score())) {
                 bestBrand = brand;
@@ -101,21 +106,21 @@ public class MatchingService {
     }
 
     /** Highest-scoring brand signal for one brand across all texts and tokens, or null. */
-    private Signal bestSignalFor(Brand brand, List<String> texts) {
+    private Signal bestSignalFor(Brand brand, List<TextForms> forms) {
         Signal best = null;
-        for (String text : texts) {
-            String raw = TextNormalizer.compact(text);
-            String skeleton = TextNormalizer.skeleton(text);
-            List<String> words = typoCandidates(text);
-
-            for (String token : sortedTokens(brand)) {
+        List<String> tokens = sortedTokens(brand);
+        List<String> tokenSkeletons = tokens.stream().map(TextNormalizer::skeleton).toList();
+        for (TextForms form : forms) {
+            for (int i = 0; i < tokens.size(); i++) {
+                String token = tokens.get(i);
+                String tokenSkeleton = tokenSkeletons.get(i);
                 Signal signal = null;
-                if (raw.contains(token)) {
+                if (form.raw().contains(token)) {
                     signal = new Signal(properties.scores().brandExact(), BRAND_EXACT + ":" + token);
-                } else if (skeleton.contains(TextNormalizer.skeleton(token))) {
+                } else if (form.skeleton().contains(tokenSkeleton)) {
                     signal = new Signal(properties.scores().homoglyph(), HOMOGLYPH + ":" + token);
                 } else {
-                    int distance = typoDistance(TextNormalizer.skeleton(token), words);
+                    int distance = typoDistance(tokenSkeleton, form.words());
                     if (distance > 0) {
                         signal = new Signal(properties.scores().typosquat(),
                                 TYPOSQUAT + ":" + token + "(distance=" + distance + ")");
@@ -198,5 +203,9 @@ public class MatchingService {
     }
 
     private record Signal(int score, String reason) {
+    }
+
+    /** Exact form, folded form and typo-candidate words of one examined text. */
+    private record TextForms(String raw, String skeleton, List<String> words) {
     }
 }

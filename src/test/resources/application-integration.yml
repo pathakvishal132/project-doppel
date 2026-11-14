@@ -1,0 +1,3 @@
+# Profile for the Testcontainers Redis integration test; Redis host/port come from @ServiceConnection.
+doppel:
+  store: redis

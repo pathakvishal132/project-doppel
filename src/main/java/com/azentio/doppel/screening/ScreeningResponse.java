@@ -14,11 +14,12 @@ public record ScreeningResponse(
         String matchedBrandName,
         List<String> reasons,
         String maskedAccount,
-        Instant screenedAt) {
+        Instant screenedAt,
+        boolean cached) {
 
     static ScreeningResponse from(ScreeningRecord r) {
         return new ScreeningResponse(r.getRequestId(), r.getVpa(), r.getDecision(), r.getScore(),
                 r.getMatchedBrandId(), r.getMatchedBrandName(), Reasons.split(r.getReasons()),
-                r.getMaskedAccount(), r.getCreatedAt());
+                r.getMaskedAccount(), r.getCreatedAt(), r.isCached());
     }
 }

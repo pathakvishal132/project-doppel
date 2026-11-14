@@ -5,6 +5,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 /**
  * Normalization helpers used by {@link MatchingService}.
@@ -50,6 +51,9 @@ public final class TextNormalizer {
             Map.entry('0', 'o'), Map.entry('1', 'l'), Map.entry('3', 'e'), Map.entry('4', 'a'),
             Map.entry('5', 's'), Map.entry('7', 't'), Map.entry('8', 'b'), Map.entry('9', 'g'));
 
+    private static final Pattern NON_ALNUM = Pattern.compile("[^\\p{L}\\p{N}]");
+    private static final Pattern SEPARATORS = Pattern.compile("[^\\p{L}\\p{N}]+");
+
     private TextNormalizer() {
     }
 
@@ -61,16 +65,16 @@ public final class TextNormalizer {
     }
 
     public static String compact(String input) {
-        return normalize(input).replaceAll("[^\\p{L}\\p{N}]", "");
+        return NON_ALNUM.matcher(normalize(input)).replaceAll("");
     }
 
     public static String skeleton(String input) {
-        return foldConfusables(input).replaceAll("[^\\p{L}\\p{N}]", "");
+        return NON_ALNUM.matcher(foldConfusables(input)).replaceAll("");
     }
 
     /** Words split on separators; each word is folded to its skeleton. */
     public static List<String> skeletonWords(String input) {
-        return Arrays.stream(foldConfusables(input).split("[^\\p{L}\\p{N}]+"))
+        return Arrays.stream(SEPARATORS.split(foldConfusables(input)))
                 .filter(w -> !w.isEmpty())
                 .toList();
     }

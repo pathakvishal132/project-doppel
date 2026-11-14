@@ -59,12 +59,15 @@ public class ScreeningRecord {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
+    @Column(nullable = false)
+    private boolean cached;
+
     protected ScreeningRecord() {
     }
 
     public ScreeningRecord(String requestId, String vpa, String displayName, String maskedAccount,
             String registrantRef, Long matchedBrandId, String matchedBrandName, Decision decision, int score,
-            String reasons, Instant requestTimestamp, Instant createdAt) {
+            String reasons, Instant requestTimestamp, Instant createdAt, boolean cached) {
         this.requestId = requestId;
         this.vpa = vpa;
         this.displayName = displayName;
@@ -77,6 +80,7 @@ public class ScreeningRecord {
         this.reasons = reasons;
         this.requestTimestamp = requestTimestamp;
         this.createdAt = createdAt;
+        this.cached = cached;
     }
 
     public Long getId() { return id; }
@@ -92,4 +96,5 @@ public class ScreeningRecord {
     public String getReasons() { return reasons; }
     public Instant getRequestTimestamp() { return requestTimestamp; }
     public Instant getCreatedAt() { return createdAt; }
+    public boolean isCached() { return cached; }
 }

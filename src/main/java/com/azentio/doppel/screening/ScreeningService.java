@@ -1,7 +1,15 @@
 package com.azentio.doppel.screening;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HexFormat;
+import java.util.List;
+import java.util.Locale;
+import java.util.Optional;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,9 +21,11 @@ import com.azentio.doppel.alert.Alert;
 import com.azentio.doppel.alert.AlertRepository;
 import com.azentio.doppel.alert.AlertStatus;
 import com.azentio.doppel.brand.BrandService;
+import com.azentio.doppel.brand.RegistryVersion;
+import com.azentio.doppel.campaign.CampaignTracker;
 import com.azentio.doppel.common.AccountProtector;
+import com.azentio.doppel.config.DoppelProperties;
 import com.azentio.doppel.matching.Decision;
-import com.azentio.doppel.matching.MatchResult;
 import com.azentio.doppel.matching.MatchingService;
 
 @Service
@@ -23,29 +33,44 @@ public class ScreeningService {
 
     private static final Logger log = LoggerFactory.getLogger(ScreeningService.class);
 
+    public static final String CAMPAIGN_BURST = "CAMPAIGN_BURST";
+
     private final ScreeningRepository screeningRepository;
     private final AlertRepository alertRepository;
     private final BrandService brandService;
+    private final RegistryVersion registryVersion;
     private final MatchingService matchingService;
+    private final ScreeningCache screeningCache;
+    private final CampaignTracker campaignTracker;
     private final AccountProtector accountProtector;
+    private final DoppelProperties properties;
     private final TransactionTemplate transactionTemplate;
     private final Clock clock;
 
     public ScreeningService(ScreeningRepository screeningRepository, AlertRepository alertRepository,
-            BrandService brandService, MatchingService matchingService, AccountProtector accountProtector,
-            TransactionTemplate transactionTemplate, Clock clock) {
+            BrandService brandService, RegistryVersion registryVersion, MatchingService matchingService,
+            ScreeningCache screeningCache, CampaignTracker campaignTracker, AccountProtector accountProtector,
+            DoppelProperties properties, TransactionTemplate transactionTemplate, Clock clock) {
         this.screeningRepository = screeningRepository;
         this.alertRepository = alertRepository;
         this.brandService = brandService;
+        this.registryVersion = registryVersion;
         this.matchingService = matchingService;
+        this.screeningCache = screeningCache;
+        this.campaignTracker = campaignTracker;
         this.accountProtector = accountProtector;
+        this.properties = properties;
         this.transactionTemplate = transactionTemplate;
         this.clock = clock;
     }
 
     /**
-     * Screens a payee. Idempotent on requestId: a repeated requestId returns the originally stored
-     * response and creates no new screening or alert (also enforced by the unique DB constraint).
+     * Screens a payee.
+     * <ol>
+     *   <li>Repeated requestId → original stored response (no re-scoring, no campaign count, no new alert).</li>
+     *   <li>Brand matching → from the screening cache when possible (key includes the registry version).</li>
+     *   <li>Campaign check, decision, persistence and alerting → on every request.</li>
+     * </ol>
      */
     public ScreeningResponse screen(ScreeningRequest request) {
         var existing = screeningRepository.findByRequestId(request.requestId());
@@ -54,12 +79,40 @@ public class ScreeningService {
             return ScreeningResponse.from(existing.get());
         }
 
-        MatchResult result = matchingService.match(request.vpa(), request.displayName(), brandService.findAll());
+        // 1. Brand matching (cacheable part)
+        long version = registryVersion.current();
+        String cacheKey = cacheKey(version, request.vpa(), request.displayName());
+        Optional<CachedMatch> hit = screeningCache.get(cacheKey);
+        CachedMatch match = hit.orElseGet(() -> {
+            CachedMatch computed = CachedMatch.from(
+                    matchingService.match(request.vpa(), request.displayName(), brandService.findAll(version)));
+            screeningCache.put(cacheKey, computed, properties.screeningCacheTtl());
+            return computed;
+        });
 
+        // 2. Campaign burst (never cached)
+        String registrantRef = accountProtector.hmac(request.registrantAccount());
+        int score = match.baseScore();
+        List<String> reasons = new ArrayList<>(match.reasons());
+        if (match.baseScore() >= properties.thresholds().review()) {
+            DoppelProperties.Campaign campaign = properties.campaign();
+            int distinct = campaignTracker.recordFlaggedVpa(registrantRef,
+                    request.vpa().toLowerCase(Locale.ROOT), request.timestamp(), campaign.window());
+            if (distinct >= campaign.minDistinctVpas()) {
+                score += properties.scores().campaignBurst();
+                reasons.add(CAMPAIGN_BURST + ":" + distinct + " distinct flagged VPAs in "
+                        + campaign.window().toMinutes() + " min");
+            }
+        }
+
+        // 3. Decision + persistence (never cached)
+        Decision decision = matchingService.decide(score);
+        Scored scored = new Scored(match, score, decision, reasons, hit.isPresent(), registrantRef);
         try {
-            ScreeningRecord saved = transactionTemplate.execute(status -> persist(request, result));
-            log.info("Screened requestId={} decision={} score={} brandId={}",
-                    saved.getRequestId(), saved.getDecision(), saved.getScore(), saved.getMatchedBrandId());
+            ScreeningRecord saved = transactionTemplate.execute(status -> persist(request, scored));
+            log.info("Screened requestId={} decision={} score={} brandId={} cached={}",
+                    saved.getRequestId(), saved.getDecision(), saved.getScore(), saved.getMatchedBrandId(),
+                    saved.isCached());
             return ScreeningResponse.from(saved);
         } catch (DataIntegrityViolationException e) {
             // Concurrent request with the same requestId won the race: return its result.
@@ -69,22 +122,40 @@ public class ScreeningService {
         }
     }
 
-    private ScreeningRecord persist(ScreeningRequest request, MatchResult result) {
+    private record Scored(CachedMatch match, int score, Decision decision, List<String> reasons, boolean cached,
+            String registrantRef) {
+    }
+
+    private ScreeningRecord persist(ScreeningRequest request, Scored s) {
         String masked = accountProtector.mask(request.registrantAccount());
-        String registrantRef = accountProtector.hmac(request.registrantAccount());
         Instant now = clock.instant();
-        String reasons = Reasons.join(result.reasons());
+        String reasons = Reasons.join(s.reasons());
 
         ScreeningRecord record = screeningRepository.saveAndFlush(new ScreeningRecord(
-                request.requestId(), request.vpa(), request.displayName(), masked, registrantRef,
-                result.brandId(), result.brandName(), result.decision(), result.score(), reasons,
-                request.timestamp(), now));
+                request.requestId(), request.vpa(), request.displayName(), masked, s.registrantRef(),
+                s.match().brandId(), s.match().brandName(), s.decision(), s.score(), reasons,
+                request.timestamp(), now, s.cached()));
 
-        if (result.decision() != Decision.ALLOW) {
+        if (s.decision() != Decision.ALLOW) {
             alertRepository.saveAndFlush(new Alert(request.requestId(), request.vpa(), request.displayName(),
-                    result.brandId(), result.brandName(), result.decision(), result.score(), reasons,
-                    masked, registrantRef, AlertStatus.OPEN, now));
+                    s.match().brandId(), s.match().brandName(), s.decision(), s.score(), reasons,
+                    masked, s.registrantRef(), AlertStatus.OPEN, now));
         }
         return record;
+    }
+
+    /**
+     * doppel:screen:v{registryVersion}:{sha256(lower-cased VPA + '\n' + displayName)}. The display name is hashed,
+     * so keys have a fixed size and contain no user text.
+     */
+    static String cacheKey(long registryVersion, String vpa, String displayName) {
+        try {
+            MessageDigest sha = MessageDigest.getInstance("SHA-256");
+            byte[] digest = sha.digest((vpa.toLowerCase(Locale.ROOT) + "\n" + displayName)
+                    .getBytes(StandardCharsets.UTF_8));
+            return "doppel:screen:v" + registryVersion + ":" + HexFormat.of().formatHex(digest);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
     }
 }

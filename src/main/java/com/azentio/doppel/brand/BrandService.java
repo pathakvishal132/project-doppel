@@ -12,6 +12,7 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import com.azentio.doppel.config.CacheConfig;
 import com.azentio.doppel.matching.TextNormalizer;
@@ -22,18 +23,23 @@ public class BrandService {
     private static final Logger log = LoggerFactory.getLogger(BrandService.class);
 
     private final BrandRepository brandRepository;
+    private final RegistryVersion registryVersion;
+    private final TransactionTemplate transactionTemplate;
 
-    public BrandService(BrandRepository brandRepository) {
+    public BrandService(BrandRepository brandRepository, RegistryVersion registryVersion,
+            TransactionTemplate transactionTemplate) {
         this.brandRepository = brandRepository;
+        this.registryVersion = registryVersion;
+        this.transactionTemplate = transactionTemplate;
     }
 
     /**
-     * Brand registry used by every screening. Served from the in-memory "brands" cache; the database is
-     * only read on the first call and after a brand is added.
+     * Brand registry for the given registry version, served from the in-memory "brands" cache. Keying on the
+     * version means a list loaded before a registry change can never be returned for a newer version.
      */
-    @Cacheable(CacheConfig.BRANDS_CACHE)
+    @Cacheable(value = CacheConfig.BRANDS_CACHE, key = "#version", sync = true) // one loader, others wait
     @Transactional(readOnly = true)
-    public List<Brand> findAll() {
+    public List<Brand> findAll(long version) {
         log.debug("Loading brand registry from database");
         return List.copyOf(brandRepository.findAllByOrderByIdAsc());
     }
@@ -44,9 +50,9 @@ public class BrandService {
     }
 
     /**
-     * Adds a brand. Deliberately NOT @Transactional: the insert commits inside saveAndFlush, and the cache is
-     * evicted only after this method returns, i.e. after the commit. Evicting before the commit could let a
-     * concurrent screening re-cache the old registry.
+     * Adds a brand and bumps the registry version in ONE transaction. The next screening reads the new version,
+     * so it misses both the brand-list cache and the Redis screening cache and is scored with the new brand.
+     * The in-memory brand cache is cleared afterwards only to free memory held by the old version.
      */
     @CacheEvict(value = CacheConfig.BRANDS_CACHE, allEntries = true)
     public BrandResponse create(CreateBrandRequest request) {
@@ -73,8 +79,12 @@ public class BrandService {
         }
 
         try {
-            Brand saved = brandRepository.saveAndFlush(new Brand(name, tokens, vpas));
-            log.info("Brand created id={} name={} - brand cache evicted", saved.getId(), saved.getName());
+            Brand saved = transactionTemplate.execute(status -> {
+                Brand brand = brandRepository.saveAndFlush(new Brand(name, tokens, vpas));
+                registryVersion.bump();
+                return brand;
+            });
+            log.info("Brand created id={} name={} - registry version bumped", saved.getId(), saved.getName());
             return BrandResponse.from(saved);
         } catch (DataIntegrityViolationException e) {
             // concurrent create with the same name / VPA lost the race against the unique constraints

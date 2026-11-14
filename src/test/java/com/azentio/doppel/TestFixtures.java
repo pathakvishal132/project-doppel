@@ -1,5 +1,6 @@
 package com.azentio.doppel;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Set;
 
@@ -15,10 +16,12 @@ public final class TestFixtures {
     public static DoppelProperties properties() {
         return new DoppelProperties(
                 "test-secret",
-                new DoppelProperties.Scores(50, 60, 40, 20),
+                new DoppelProperties.Scores(50, 60, 40, 20, 30),
                 new DoppelProperties.Thresholds(70, 40),
-                List.of("refund", "refunds", "support", "helpdesk", "help", "care", "kyc", "cashback", "offer",
-                        "reward", "update"));
+                // assignment defaults
+                List.of("support", "care", "refund", "kyc", "cashback", "helpline", "reward", "verify", "offer"),
+                Duration.ofHours(24),
+                new DoppelProperties.Campaign(Duration.ofMinutes(60), 3));
     }
 
     public static Brand zentraBank() {

@@ -17,13 +17,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.cache.CacheManager;
-import org.springframework.cache.interceptor.SimpleKey;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 
+import com.azentio.doppel.campaign.InMemoryCampaignTracker;
 import com.azentio.doppel.config.CacheConfig;
+import com.azentio.doppel.screening.InMemoryScreeningCache;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -39,6 +40,12 @@ class BrandApiIntegrationTest {
     private JdbcTemplate jdbc;
     @Autowired
     private CacheManager cacheManager;
+    @Autowired
+    private RegistryVersion registryVersion;
+    @Autowired
+    private InMemoryScreeningCache screeningCache;
+    @Autowired
+    private InMemoryCampaignTracker campaignTracker;
 
     private int requestCounter;
 
@@ -51,7 +58,10 @@ class BrandApiIntegrationTest {
         jdbc.update("DELETE FROM brand_token WHERE brand_id >= 100");
         jdbc.update("DELETE FROM brand_vpa WHERE brand_id >= 100");
         jdbc.update("DELETE FROM brand WHERE id >= 100");
+        jdbc.update("UPDATE brand_registry_version SET version = version + 1 WHERE id = 1"); // registry changed
         cacheManager.getCache(CacheConfig.BRANDS_CACHE).clear();
+        screeningCache.clear();
+        campaignTracker.clear();
     }
 
     private ResultActions createBrand(String json) throws Exception {
@@ -67,8 +77,8 @@ class BrandApiIntegrationTest {
                 .andExpect(status().isOk());
     }
 
-    private Object cachedRegistry() {
-        return cacheManager.getCache(CacheConfig.BRANDS_CACHE).get(SimpleKey.EMPTY);
+    private Object cachedRegistry(long version) {
+        return cacheManager.getCache(CacheConfig.BRANDS_CACHE).get(version);
     }
 
     @Test
@@ -88,11 +98,13 @@ class BrandApiIntegrationTest {
 
     @Test
     void nextScreeningUsesNewBrandWithoutRestart() throws Exception {
+        long before = registryVersion.current();
         screen("vortexa.kyc@ybl", "Vortexa KYC").andExpect(jsonPath("$.decision").value("ALLOW"));
-        assertThat(cachedRegistry()).as("registry cached after first screening").isNotNull();
+        assertThat(cachedRegistry(before)).as("registry cached after first screening").isNotNull();
 
         createBrand(VORTEXA).andExpect(status().isCreated());
-        assertThat(cachedRegistry()).as("cache evicted after create").isNull();
+        assertThat(registryVersion.current()).as("registry version bumped").isEqualTo(before + 1);
+        assertThat(cachedRegistry(before)).as("old brand list evicted").isNull();
 
         screen("vortexa.kyc@ybl", "Vortexa KYC")
                 .andExpect(jsonPath("$.decision").value("BLOCK"))
@@ -104,17 +116,21 @@ class BrandApiIntegrationTest {
     }
 
     @Test
-    void screeningIsServedFromCacheNotDatabase() throws Exception {
-        screen("ab@ybl", "Warm cache"); // loads the registry into the cache
+    void cachesAreKeyedOnRegistryVersion() throws Exception {
+        screen("hiddenbrand.kyc@ybl", "x").andExpect(jsonPath("$.decision").value("ALLOW"));
 
-        // insert directly, bypassing the API and therefore its cache eviction
+        // insert directly in SQL, WITHOUT bumping the version: caches still serve the old registry
         jdbc.update("INSERT INTO brand (id, name) VALUES (500, 'Hidden Brand')");
         jdbc.update("INSERT INTO brand_token (brand_id, token) VALUES (500, 'hiddenbrand')");
+        screen("hiddenbrand.kyc@ybl", "x")
+                .andExpect(jsonPath("$.decision").value("ALLOW"))
+                .andExpect(jsonPath("$.cached").value(true));
 
-        screen("hiddenbrand.kyc@ybl", "x").andExpect(jsonPath("$.decision").value("ALLOW")); // stale cache wins
-
-        cacheManager.getCache(CacheConfig.BRANDS_CACHE).clear();
-        screen("hiddenbrand.kyc@ybl", "x").andExpect(jsonPath("$.decision").value("BLOCK"));
+        // bumping the version (what POST /api/v1/brands does in its transaction) makes every cache entry unreachable
+        jdbc.update("UPDATE brand_registry_version SET version = version + 1 WHERE id = 1");
+        screen("hiddenbrand.kyc@ybl", "x")
+                .andExpect(jsonPath("$.decision").value("BLOCK"))
+                .andExpect(jsonPath("$.cached").value(false));
     }
 
     @Test

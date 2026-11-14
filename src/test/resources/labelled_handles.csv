@@ -1,0 +1,138 @@
+vpa,display_name,category,label
+zentrabank@zbk,Zentra Bank,OFFICIAL_HANDLE,BENIGN
+zentra.support@zbk,Zentra Bank Support,OFFICIAL_HANDLE,BENIGN
+shopkart@kotak,ShopKart,OFFICIAL_HANDLE,BENIGN
+shopkart.refunds@kotak,ShopKart Refunds,OFFICIAL_HANDLE,BENIGN
+electrapower.bills@axis,Electra Power Bills,OFFICIAL_HANDLE,BENIGN
+novapay@ybl,NovaPay Wallet,OFFICIAL_HANDLE,BENIGN
+quickrail@icici,QuickRail Tickets,OFFICIAL_HANDLE,BENIGN
+fintrust.premium@hdfc,FinTrust Insurance Premium,OFFICIAL_HANDLE,BENIGN
+medicore@sbi,MediCore Pharmacy,OFFICIAL_HANDLE,BENIGN
+skyvista.pay@axis,SkyVista Airlines,OFFICIAL_HANDLE,BENIGN
+gramintel.recharge@ybl,GraminTel Recharge,OFFICIAL_HANDLE,BENIGN
+urbanfeast@paytm,UrbanFeast Foods,OFFICIAL_HANDLE,BENIGN
+bluewave.bills@icici,BlueWave Broadband,OFFICIAL_HANDLE,BENIGN
+orvanta.sip@hdfc,Orvanta Mutual Fund,OFFICIAL_HANDLE,BENIGN
+kavachgas@sbi,Kavach Gas,OFFICIAL_HANDLE,BENIGN
+ZentraBank@ZBK,Zentra Bank,OFFICIAL_HANDLE,BENIGN
+ramesh.kumar@okicici,Ramesh Kumar,LEGITIMATE,BENIGN
+priya.sharma99@ybl,Priya Sharma,LEGITIMATE,BENIGN
+sharma.kirana@paytm,Sharma Kirana Store,LEGITIMATE,BENIGN
+anil.verma@oksbi,Anil Verma,LEGITIMATE,BENIGN
+meena.textiles@ybl,Meena Textiles,LEGITIMATE,BENIGN
+9876543210@ybl,Suresh Patel,LEGITIMATE,BENIGN
+rahul.g@okaxis,Rahul Gupta,LEGITIMATE,BENIGN
+kavya.nair@okhdfc,Kavya Nair,LEGITIMATE,BENIGN
+balaji.sweets@paytm,Balaji Sweets,LEGITIMATE,BENIGN
+fresh.mart.vizag@ybl,Fresh Mart Vizag,LEGITIMATE,BENIGN
+deepak_auto@oksbi,Deepak Auto Works,LEGITIMATE,BENIGN
+sunita.tailor@ybl,Sunita Tailoring,LEGITIMATE,BENIGN
+mohan.dairy@okicici,Mohan Dairy Farm,LEGITIMATE,BENIGN
+green.leaf.cafe@ybl,Green Leaf Cafe,LEGITIMATE,BENIGN
+arjun.reddy@okaxis,Arjun Reddy,LEGITIMATE,BENIGN
+pooja.beauty@paytm,Pooja Beauty Parlour,LEGITIMATE,BENIGN
+krishna.medicals@ybl,Krishna Medicals,LEGITIMATE,BENIGN
+vikram.singh82@oksbi,Vikram Singh,LEGITIMATE,BENIGN
+lakshmi.jewellers@okhdfc,Lakshmi Jewellers,LEGITIMATE,BENIGN
+city.bakery@ybl,City Bakery,LEGITIMATE,BENIGN
+zentrabank.refund@okaxis,Zentra Bank Refunds,BRAND_EXACT,SUSPICIOUS
+zentrabank.pay@okhdfc,Zentra Bank,BRAND_EXACT,SUSPICIOUS
+zentra.alerts@ybl,Zentra Alerts,BRAND_EXACT,SUSPICIOUS
+shopkart.sale@ybl,ShopKart Sale,BRAND_EXACT,SUSPICIOUS
+shopkart-orders@paytm,ShopKart Orders,BRAND_EXACT,SUSPICIOUS
+electrapower@okicici,Electra Power,BRAND_EXACT,SUSPICIOUS
+electra.bill.desk@ybl,Electra Bill Desk,BRAND_EXACT,SUSPICIOUS
+novapay.wallet@oksbi,NovaPay Wallet,BRAND_EXACT,SUSPICIOUS
+quickrail.tatkal@ybl,QuickRail Tatkal,BRAND_EXACT,SUSPICIOUS
+fintrust.claims@okaxis,FinTrust Claims,BRAND_EXACT,SUSPICIOUS
+medicore.orders@ybl,MediCore Orders,BRAND_EXACT,SUSPICIOUS
+skyvista.booking@paytm,SkyVista Booking,BRAND_EXACT,SUSPICIOUS
+gramintel.pay@ybl,GraminTel,BRAND_EXACT,SUSPICIOUS
+urbanfeast.orders@okhdfc,UrbanFeast,BRAND_EXACT,SUSPICIOUS
+bluewave.net@ybl,BlueWave Net,BRAND_EXACT,SUSPICIOUS
+orvanta.invest@oksbi,Orvanta Invest,BRAND_EXACT,SUSPICIOUS
+kavachgas.booking@ybl,Kavach Gas Booking,BRAND_EXACT,SUSPICIOUS
+pixelmart.store@paytm,PixelMart Store,BRAND_EXACT,SUSPICIOUS
+swiftcab.driver@ybl,SwiftCab,BRAND_EXACT,SUSPICIOUS
+lumoracard.pay@ybl,Lumora Card,BRAND_EXACT,SUSPICIOUS
+harithawater@okaxis,Haritha Water,BRAND_EXACT,SUSPICIOUS
+rk.payments@ybl,Zentra Bank,BRAND_EXACT,SUSPICIOUS
+z3ntrabank@ybl,Zentra Bank,HOMOGLYPH,SUSPICIOUS
+zentr4bank.pay@okaxis,Zentra Pay,HOMOGLYPH,SUSPICIOUS
+sh0pkart@ybl,Shop Kart,HOMOGLYPH,SUSPICIOUS
+shopk4rt.deals@paytm,Deals Store,HOMOGLYPH,SUSPICIOUS
+e1ectrapower@ybl,Power Bills,HOMOGLYPH,SUSPICIOUS
+3lectra.bills@okicici,Bill Payments,HOMOGLYPH,SUSPICIOUS
+n0vapay@ybl,Wallet Services,HOMOGLYPH,SUSPICIOUS
+quickra1l@paytm,Rail Tickets,HOMOGLYPH,SUSPICIOUS
+f1ntrust@ybl,Insurance Desk,HOMOGLYPH,SUSPICIOUS
+rnedicore@okaxis,Pharmacy Orders,HOMOGLYPH,SUSPICIOUS
+skyv1sta@ybl,Flight Desk,HOMOGLYPH,SUSPICIOUS
+bluevvave@ybl,Broadband Bills,HOMOGLYPH,SUSPICIOUS
+pixelrnart@paytm,Electronics Sale,HOMOGLYPH,SUSPICIOUS
+swiftc4b@ybl,Cab Payments,HOMOGLYPH,SUSPICIOUS
+0rvanta@oksbi,Fund House,HOMOGLYPH,SUSPICIOUS
+ravi.k22@ybl,Zеntra Bank,HOMOGLYPH,SUSPICIOUS
+payments.desk@okaxis,ЅhорKart,HOMOGLYPH,SUSPICIOUS
+mk.store@ybl,Еlectra Роwer,HOMOGLYPH,SUSPICIOUS
+nk.wallet@paytm,Νοvapay Wallet,HOMOGLYPH,SUSPICIOUS
+ab.traders@ybl,Ｚｅｎｔｒａ Ｂａｎｋ,HOMOGLYPH,SUSPICIOUS
+zentrbank@ybl,Bank Desk,TYPOSQUAT,SUSPICIOUS
+zentarbank.pay@okaxis,Payments,TYPOSQUAT,SUSPICIOUS
+zentrabnk@paytm,Accounts,TYPOSQUAT,SUSPICIOUS
+zentrabanc@ybl,Bank Services,TYPOSQUAT,SUSPICIOUS
+shopkrat@ybl,Online Store,TYPOSQUAT,SUSPICIOUS
+shpkart@okicici,Store Orders,TYPOSQUAT,SUSPICIOUS
+shopkartt@ybl,Store,TYPOSQUAT,SUSPICIOUS
+electrapowr@ybl,Power Payments,TYPOSQUAT,SUSPICIOUS
+eletrapower@paytm,Power Payments,TYPOSQUAT,SUSPICIOUS
+novapy@ybl,Wallet,TYPOSQUAT,SUSPICIOUS
+quikrail@oksbi,Train Booking,TYPOSQUAT,SUSPICIOUS
+fintrsut@ybl,Insurance,TYPOSQUAT,SUSPICIOUS
+medicor.store@ybl,Pharma Store,TYPOSQUAT,SUSPICIOUS
+skyvsita@paytm,Air Tickets,TYPOSQUAT,SUSPICIOUS
+urbanfest@ybl,Food Orders,TYPOSQUAT,SUSPICIOUS
+harithawatr@okaxis,Water Bills,TYPOSQUAT,SUSPICIOUS
+swifcab@ybl,Cab Rides,TYPOSQUAT,SUSPICIOUS
+pixelmrt@ybl,Gadgets,TYPOSQUAT,SUSPICIOUS
+zentrabank.kyc@ybl,Zentra Bank KYC,LURE_COMBO,SUSPICIOUS
+zentra.helpdesk@okaxis,Zentra Helpdesk,LURE_COMBO,SUSPICIOUS
+shopkart.cashback@ybl,ShopKart Cashback,LURE_COMBO,SUSPICIOUS
+shopkart.refund@paytm,ShopKart Refund,LURE_COMBO,SUSPICIOUS
+electrapower.update@ybl,Electra Power KYC Update,LURE_COMBO,SUSPICIOUS
+electra.billpay@okicici,Electra Billpay,LURE_COMBO,SUSPICIOUS
+novapay.reward@ybl,NovaPay Rewards,LURE_COMBO,SUSPICIOUS
+fintrust.claim@oksbi,FinTrust Claim,LURE_COMBO,SUSPICIOUS
+skyvista.refunds@ybl,SkyVista Refunds,LURE_COMBO,SUSPICIOUS
+z3ntrabank.support@ybl,Zentra Support,LURE_COMBO,SUSPICIOUS
+shopkrat.offer@ybl,Mega Offer,LURE_COMBO,SUSPICIOUS
+zentrbankrefund@paytm,Refund Desk,LURE_COMBO,SUSPICIOUS
+bluewave.customercare@ybl,BlueWave Care,LURE_COMBO,SUSPICIOUS
+lumora.bonus@okaxis,Lumora Card Bonus,LURE_COMBO,SUSPICIOUS
+kavachgas.subsidy.claim@ybl,Kavach Gas Subsidy,LURE_COMBO,SUSPICIOUS
+refund.desk.rk@ybl,RK Refund Desk,LURE_ONLY,BENIGN
+help4u.mobiles@ybl,Help4U Mobiles,LURE_ONLY,BENIGN
+cashback.king@paytm,Cashback King Deals,LURE_ONLY,BENIGN
+care.clinic@okicici,Care Clinic,LURE_ONLY,BENIGN
+offer.zone.store@ybl,Offer Zone,LURE_ONLY,BENIGN
+lucky.rewards.club@ybl,Lucky Rewards Club,LURE_ONLY,BENIGN
+service.centre.raju@oksbi,Raju Service Centre,LURE_ONLY,BENIGN
+kyc.documents.agent@ybl,KYC Agent Ramu,LURE_ONLY,BENIGN
+support.team.ngo@okaxis,Support Team NGO,LURE_ONLY,BENIGN
+bonus.sweets@paytm,Bonus Sweets,LURE_ONLY,BENIGN
+electrician.raju@ybl,Raju Electrician,NEAR_MISS,BENIGN
+shopkeeper.ram@ybl,Ram Shopkeeper,NEAR_MISS,BENIGN
+bluewater.cafe@ybl,Blue Water Cafe,NEAR_MISS,BENIGN
+central.stores@oksbi,Central Stores,NEAR_MISS,BENIGN
+quick.rides@ybl,Quick Rides,NEAR_MISS,BENIGN
+nova.pharma@okaxis,Nova Pharma,NEAR_MISS,BENIGN
+sky.vision.optics@ybl,Sky Vision Optics,NEAR_MISS,BENIGN
+urban.fresh@paytm,Urban Fresh,NEAR_MISS,BENIGN
+pixel.studio@ybl,Pixel Studio,NEAR_MISS,BENIGN
+swift.couriers@okicici,Swift Couriers,NEAR_MISS,BENIGN
+medicare.clinic@ybl,Medicare Clinic,NEAR_MISS,BENIGN
+electra.sharma@ybl,Electra Sharma,NEAR_MISS,BENIGN
+fintech.solutions@okaxis,Fintech Solutions,NEAR_MISS,BENIGN
+gramin.kirana@ybl,Gramin Kirana,NEAR_MISS,BENIGN
+haritha.foods@oksbi,Haritha Foods,NEAR_MISS,BENIGN
+kavach.security@ybl,Kavach Security,NEAR_MISS,BENIGN
